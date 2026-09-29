@@ -8,6 +8,8 @@ use std::future::Future;
 use std::sync::Arc;
 use tokio::task::{JoinError, JoinSet};
 
+pub mod network;
+
 /// Count whitespace-separated, lowercase tokens on the caller's thread.
 /// O(n) time for n input bytes, excluding hash and allocation constants.
 pub fn count_words_sequential(text: &str) -> HashMap<String, usize> {

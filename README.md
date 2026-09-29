@@ -51,9 +51,11 @@ Input format: first non-comment line is the vertex count. Each later line is `fr
 ```text
 cargo run -p concurrency_lab -- text README.md
 cargo run -p concurrency_lab -- async
+cargo run -p concurrency_lab -- tcp
 ```
 
 Follow [the concurrency and database chapter](docs/CONCURRENCY_AND_DATABASE.md) for the architecture, experiments, and live PostgreSQL test instructions.
+GitHub CI runs the workspace checks, backend database integration tests, and frontend build on every push.
 
 For measurements, use `cargo bench --bench core_benchmarks` in release mode. Benchmarks use identical shuffled tree input to compare BST and AVL insertion; a sorted plain BST has quadratic insertion time. Do not use debug-mode test runs as performance evidence.
 

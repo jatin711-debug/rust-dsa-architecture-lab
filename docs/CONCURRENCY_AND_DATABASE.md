@@ -28,9 +28,10 @@ The printed times are a quick observation, not a benchmark. Repeat runs and comp
 
 ```text
 cargo run -p concurrency_lab -- async
+cargo run -p concurrency_lab -- tcp
 ```
 
-Change the simulation to a local HTTP request. Measure peak in-flight requests, total elapsed time, timeout count, and memory usage. Compare limits of 1, 4, and 32. A higher limit can reduce throughput if it saturates the downstream service.
+The TCP command uses a local server and actual socket reads and writes. Measure peak in-flight requests, total elapsed time, timeout count, and memory usage. Compare limits of 1, 4, and 32. A higher limit can reduce throughput if it saturates the downstream service.
 
 ## Database transaction exercise
 
@@ -47,7 +48,7 @@ flowchart LR
 
 The transaction makes stock updates and order inserts one unit. A failed stock check or arithmetic overflow returns before commit, so the transaction rolls back. `SELECT ... FOR UPDATE` makes competing orders wait for the same product row; the second order sees the updated stock. Sorting product IDs gives overlapping orders a consistent lock order, reducing deadlocks. The backend also combines repeated product lines before locking, so a duplicate cannot bypass stock checks. Checked multiplication and addition prevent large prices or quantities from wrapping the total.
 
-The order list fetches parent orders and all their items with two queries. The previous loop issued one item query per order, which grows to N+1 round trips. This is a query-count improvement; the endpoint can still return an unbounded number of orders. Pagination and a stable cursor are the next step.
+The order list fetches parent orders and all their items with two queries. The previous loop issued one item query per order, which grows to N+1 round trips. A composite index supports its `(user_id, created_at DESC, id DESC)` filter and stable sort. This is a query-count improvement; the endpoint can still return an unbounded number of orders. Pagination with a cursor is the next step.
 
 Product updates use one `UPDATE` with `COALESCE` for omitted fields. This prevents two requests changing different fields from overwriting each other's work through a read-then-full-write sequence. `stock_quantity` is still an absolute admin-set value; inventory adjustments need a separate operation with explicit business rules.
 
@@ -59,7 +60,7 @@ Normal backend tests have no service dependency. The optional tests use SQLx to 
 cargo test --features db-integration --test db_integration
 ```
 
-The tests place two orders for the last item at once and verify exactly one succeeds. They also verify duplicate lines, totals, stock, list hydration, and concurrent edits to different product fields. These tests were compiled here; they require a live PostgreSQL server to execute.
+The tests place two orders for the last item at once and verify exactly one succeeds. They also verify duplicate lines, totals, stock, list hydration, and concurrent edits to different product fields. GitHub CI runs them against a PostgreSQL service; running them locally requires a live PostgreSQL server.
 
 ### Inspect query behavior
 
@@ -68,7 +69,7 @@ Use `EXPLAIN (ANALYZE, BUFFERS)` on representative list queries in a disposable 
 ## Practice milestones
 
 1. Extend the Tokio cancellation test to cover a blocking CPU loop, then explain why abort cannot stop it promptly.
-2. Replace the async demo's timer with a local TCP or HTTP server. Add a timeout and retry only for operations safe to repeat.
+2. Extend the TCP demo with server-side delay. Add retries only for operations safe to repeat, and identify how duplicate requests would be handled.
 3. Add keyset pagination to the order list using `(created_at, id)` as a stable cursor. Add a matching database index and compare query plans.
 4. Add a bounded background worker for an idempotent task. Define what happens on shutdown, panic, retry, and duplicate delivery.
 5. Run the PostgreSQL tests, then add a test where two orders lock the same two products in opposite input order.

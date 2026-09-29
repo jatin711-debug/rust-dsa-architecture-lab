@@ -1,9 +1,10 @@
+use concurrency_lab::network::run_local_tcp_demo;
 use concurrency_lab::{count_words_parallel, count_words_sequential, map_bounded};
 use std::error::Error;
 use std::time::{Duration, Instant};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut args = std::env::args().skip(1);
     match (args.next().as_deref(), args.next(), args.next()) {
         (Some("text"), Some(path), None) => {
@@ -33,8 +34,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("job {id}: {result:?}");
             }
         }
+        (Some("tcp"), None, None) => {
+            let results = run_local_tcp_demo(vec![5, 1, 4, 2, 3], 2).await?;
+            println!("local TCP responses: {results:?}");
+        }
         _ => {
-            return Err("usage: concurrency_lab text <file> | async".into());
+            return Err("usage: concurrency_lab text <file> | async | tcp".into());
         }
     }
     Ok(())

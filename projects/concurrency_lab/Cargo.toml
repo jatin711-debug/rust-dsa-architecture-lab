@@ -6,4 +6,4 @@ publish = false
 
 [dependencies]
 rayon = "1.12"
-tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "time", "net", "io-util"] }

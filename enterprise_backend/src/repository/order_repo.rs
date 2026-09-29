@@ -166,7 +166,7 @@ impl OrderRepository {
             SELECT id, user_id, status, total_amount_cents, created_at, updated_at
             FROM orders
             WHERE user_id = $1
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             "#,
         )
         .bind(user_id)

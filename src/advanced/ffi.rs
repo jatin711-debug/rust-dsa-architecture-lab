@@ -53,11 +53,10 @@ pub fn point_layout_size() -> usize {
     std::mem::size_of::<Point>()
 }
 
-/// Declares C functions from the C runtime library.
-///
-/// On Windows-MSVC the C runtime is linked by default; on other platforms the
-/// symbols come from libc. `strlen` returns the length of a NUL-terminated
-/// string; `qsort` sorts an array in place using a C comparator.
+// Declares C functions from the C runtime library.
+// On Windows-MSVC the C runtime is linked by default; on other platforms the
+// symbols come from libc. `strlen` returns the length of a NUL-terminated
+// string; `qsort` sorts an array in place using a C comparator.
 #[cfg(unix)]
 unsafe extern "C" {
     fn strlen(s: *const c_char) -> usize;
