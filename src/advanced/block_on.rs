@@ -66,12 +66,7 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
 
     // SAFETY: the raw waker holds an Arc<ExecutorState> and its vtable keeps
     // the refcount correct on clone/drop.
-    let waker = unsafe {
-        Waker::from_raw(RawWaker::new(
-            Arc::into_raw(state.clone()).cast(),
-            waker_vtable(),
-        ))
-    };
+    let waker = waker_for(&state);
     let mut cx = Context::from_waker(&waker);
 
     loop {
@@ -91,6 +86,17 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
     }
 }
 
+/// The raw waker owns one Arc strong reference until wake or drop consumes it.
+fn waker_for(state: &Arc<ExecutorState>) -> Waker {
+    // SAFETY: the vtable always treats this pointer as an Arc<ExecutorState>.
+    unsafe {
+        Waker::from_raw(RawWaker::new(
+            Arc::into_raw(Arc::clone(state)).cast(),
+            waker_vtable(),
+        ))
+    }
+}
+
 /// Builds the waker vtable for `Arc<ExecutorState>`.
 fn waker_vtable() -> &'static RawWakerVTable {
     // SAFETY: every function here operates on a valid Arc<ExecutorState>
@@ -99,8 +105,9 @@ fn waker_vtable() -> &'static RawWakerVTable {
         |data| {
             let state = unsafe { Arc::from_raw(data.cast::<ExecutorState>()) };
             let cloned = Arc::clone(&state);
-            // Re-package the new Arc; the original `state` refcount stays.
-            let _ = state;
+            // The original raw waker still owns this strong reference. Do not
+            // drop it here; only the newly cloned reference is transferred.
+            std::mem::forget(state);
             RawWaker::new(Arc::into_raw(cloned).cast(), waker_vtable())
         },
         |data| {
@@ -169,8 +176,14 @@ impl Future for TimerFuture {
         if self.inner.completed.load(Ordering::SeqCst) {
             Poll::Ready(())
         } else {
-            // Register this poll's waker so the timer thread can wake us.
-            *self.inner.waker.lock().expect("waker lock") = Some(cx.waker().clone());
+            // A timer may complete between the first check and acquiring the
+            // lock. Check again while holding it so we never register a waker
+            // after the timer thread has already looked for one.
+            let mut slot = self.inner.waker.lock().expect("waker lock");
+            if self.inner.completed.load(Ordering::SeqCst) {
+                return Poll::Ready(());
+            }
+            *slot = Some(cx.waker().clone());
             Poll::Pending
         }
     }
@@ -240,6 +253,30 @@ mod tests {
     }
 
     #[test]
+    fn raw_waker_clone_preserves_arc_counts() {
+        let state = Arc::new(ExecutorState {
+            woken: AtomicBool::new(false),
+            thread: thread::current(),
+        });
+        let waker = waker_for(&state);
+        assert_eq!(Arc::strong_count(&state), 2);
+        let clone = waker.clone();
+        assert_eq!(Arc::strong_count(&state), 3);
+        clone.wake_by_ref();
+        assert_eq!(Arc::strong_count(&state), 3);
+        drop(clone);
+        drop(waker);
+        assert_eq!(Arc::strong_count(&state), 1);
+    }
+
+    #[test]
+    fn zero_duration_timer_never_loses_wakeup() {
+        for _ in 0..100 {
+            block_on(TimerFuture::new(Duration::ZERO));
+        }
+    }
+
+    #[test]
     fn block_on_async_fn_with_yields() {
         assert_eq!(block_on(sum_after_yields(0)), 0);
         assert_eq!(block_on(sum_after_yields(5)), 10);
@@ -288,13 +325,7 @@ mod tests {
                         woken: AtomicBool::new(true),
                         thread: thread::current(),
                     });
-                    // SAFETY: test-only waker with a valid Arc state.
-                    let waker = unsafe {
-                        Waker::from_raw(RawWaker::new(
-                            Arc::into_raw(state.clone()).cast(),
-                            waker_vtable(),
-                        ))
-                    };
+                    let waker = waker_for(&state);
                     let mut cx = Context::from_waker(&waker);
                     while future.as_mut().poll(&mut cx).is_pending() {
                         polls += 1;
