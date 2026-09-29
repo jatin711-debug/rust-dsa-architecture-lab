@@ -5,6 +5,9 @@ edition = "2021"
 authors = ["Learner"]
 description = "Learning backend API with Axum, SQLx, Redis, JWT, and Postgres"
 
+[features]
+db-integration = []
+
 [dependencies]
 # Web framework & async runtime
 axum = "0.8"

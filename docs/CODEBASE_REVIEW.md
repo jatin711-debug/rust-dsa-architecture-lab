@@ -23,7 +23,8 @@ The main crate already covers linear collections, linked lists, BST/AVL/trie, a 
 2. **BST worst case.** Recursive removal and structure snapshots can still exhaust the stack on a deep tree. Convert them to iterative forms or explicitly cap input depth. Contrast the plain BST with AVL using the same sorted and shuffled inputs.
 3. **Graph API.** Invalid vertex IDs currently panic in the core API. A service-facing graph layer should return typed errors; also consider `Option<usize>` distances to remove the sentinel and distinguish overflow.
 4. **Backend boundary.** The backend now requires a JWT secret, restricts its CORS origin, fails startup if migrations fail, requires an admin role for product writes, and prevents public registration from selecting that role. It still needs a trusted admin provisioning path, service-backed integration tests, and deployment-specific configuration before deployment. Its presence alone does not imply production readiness.
-5. **Build reproducibility.** Add CI that runs formatting, Clippy, tests, and an isolated backend check. Decide separately whether generated WASM and frontend output should be committed or rebuilt in CI.
+5. **Build reproducibility.** CI now checks Rust formatting, Clippy, workspace tests, isolated PostgreSQL tests, and the frontend build. Decide separately whether generated WASM output should be committed or rebuilt in CI.
+6. **Async and database learning.** The concurrency lab now contrasts CPU parallelism with bounded waiting tasks, and the backend has optional isolated SQLx tests for concurrent orders. Work through [the concurrency and database chapter](CONCURRENCY_AND_DATABASE.md), then add cancellation, retries, pagination, and query-plan measurements.
 
 ## Practice tasks, in order
 

@@ -14,7 +14,7 @@ cargo run --example all_data_structures
 cargo run --example advanced_rust
 ```
 
-The workspace contains the core library, a WASM visualizer, and two small command line projects. The backend in `enterprise_backend/` has its own manifest and external PostgreSQL/Redis setup; run its checks from that directory when studying web services.
+The workspace contains the core library, a WASM visualizer, and three small command line projects. The backend in `enterprise_backend/` has its own manifest and external PostgreSQL/Redis setup; run its checks from that directory when studying web services.
 
 ## Learning sequence
 
@@ -25,7 +25,8 @@ The workspace contains the core library, a WASM visualizer, and two small comman
 | 3. Algorithms | `src/algorithms/`, `src/graph/mod.rs`, `src/union_find.rs` | complexity, graph traversal, binary search, dynamic programming | add an unweighted shortest path and test unreachable nodes |
 | 4. Application design | `projects/route_planner/`, `wasm-visualizer/` | parsing boundaries, reusable library logic, WASM boundary | support named vertices in the route planner |
 | 5. Advanced Rust | `src/advanced/` | interior mutability, `Rc`/`Weak`, threads, futures, FFI, unsafe contracts | document every invariant before changing unsafe code |
-| 6. Services | `enterprise_backend/` | async runtime, HTTP routes, state, persistence, caching | add a repository-level integration test with disposable services |
+| 6. Concurrency | `projects/concurrency_lab/`, `src/advanced/thread_pool.rs` | CPU parallelism, bounded async tasks, timeouts, cancellation | replace timer jobs with local I/O and measure peak concurrency |
+| 7. Services | `enterprise_backend/` | async runtime, HTTP routes, SQL transactions, row locks, batching, caching | run isolated database tests and add keyset pagination |
 
 At each stage, read the public API and tests first. Predict behavior for empty input, duplicates, and invalid indices before running the tests. Then make one change and run the narrow test plus `cargo test --workspace`.
 
@@ -44,6 +45,15 @@ cargo run -p route_planner -- projects/route_planner/sample.graph 0 4
 ```
 
 Input format: first non-comment line is the vertex count. Each later line is `from to nonnegative_weight`. Vertex IDs run from `0` to `count - 1`.
+
+**Concurrency lab** compares CPU parallel counting with bounded async waiting jobs:
+
+```text
+cargo run -p concurrency_lab -- text README.md
+cargo run -p concurrency_lab -- async
+```
+
+Follow [the concurrency and database chapter](docs/CONCURRENCY_AND_DATABASE.md) for the architecture, experiments, and live PostgreSQL test instructions.
 
 For measurements, use `cargo bench --bench core_benchmarks` in release mode. Benchmarks use identical shuffled tree input to compare BST and AVL insertion; a sorted plain BST has quadratic insertion time. Do not use debug-mode test runs as performance evidence.
 

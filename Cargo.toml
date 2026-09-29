@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["DSA Learner"]
 description = "Educational data structures and algorithms implemented in Rust from scratch"
-repository = ""
+repository = "https://github.com/jatin711-debug/rust-dsa-architecture-lab"
 license = "MIT OR Apache-2.0"
 rust-version = "1.96"
 
@@ -36,7 +36,7 @@ rand = "0.8"
 # and is applied to all release builds in this workspace.
 [workspace]
 resolver = "2"
-members = [".", "wasm-visualizer", "projects/mini_grep", "projects/route_planner"]
+members = [".", "wasm-visualizer", "projects/mini_grep", "projects/route_planner", "projects/concurrency_lab"]
 exclude = ["enterprise_backend"]
 
 [profile.release]

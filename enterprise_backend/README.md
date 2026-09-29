@@ -11,7 +11,7 @@ This is a standalone Cargo workspace for studying Axum, SQLx, PostgreSQL, Redis,
 
 For code checks, run `cargo fmt -- --check` and `cargo clippy --all-targets -- -D warnings` here.
 
-Unit tests for hashing and token handling require no running services. API and repository integration tests with disposable PostgreSQL and Redis are future work; passing `cargo test` currently does not validate the full service.
+Unit tests for hashing, token handling, and order validation require no running services. Optional SQLx integration tests create isolated PostgreSQL databases and verify concurrent stock updates, duplicate lines, and order listing. Use a disposable PostgreSQL server and a `DATABASE_URL` with database-creation rights, then run `cargo test --features db-integration --test db_integration`. Redis and full HTTP integration tests are still future work.
 
 Public registration creates customer accounts only. Admin accounts need a separate, trusted provisioning path; the API does not currently provide one.
 

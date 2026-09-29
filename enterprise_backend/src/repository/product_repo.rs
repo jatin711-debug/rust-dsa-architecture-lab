@@ -62,30 +62,42 @@ impl ProductRepository {
         id: Uuid,
         dto: UpdateProductDto,
     ) -> Result<Product, AppError> {
-        let existing = Self::find_by_id(pool, id)
-            .await?
-            .ok_or_else(|| AppError::NotFound(format!("Product with id {} not found", id)))?;
+        if dto.name.as_ref().is_some_and(|name| name.trim().is_empty()) {
+            return Err(AppError::BadRequest("Product name is required".to_string()));
+        }
+        if dto.price_cents.is_some_and(|price| price < 0) {
+            return Err(AppError::BadRequest(
+                "Price must be non-negative".to_string(),
+            ));
+        }
+        if dto.stock_quantity.is_some_and(|stock| stock < 0) {
+            return Err(AppError::BadRequest(
+                "Stock quantity must be non-negative".to_string(),
+            ));
+        }
 
-        let name = dto.name.unwrap_or(existing.name);
-        let description = dto.description.unwrap_or(existing.description);
-        let price_cents = dto.price_cents.unwrap_or(existing.price_cents);
-        let stock_quantity = dto.stock_quantity.unwrap_or(existing.stock_quantity);
-
+        // One statement updates only supplied fields. A separate read followed
+        // by a full-row write could overwrite another request's disjoint edit.
         let updated = sqlx::query_as::<_, Product>(
             r#"
             UPDATE products
-            SET name = $1, description = $2, price_cents = $3, stock_quantity = $4, updated_at = NOW()
+            SET name = COALESCE($1, name),
+                description = COALESCE($2, description),
+                price_cents = COALESCE($3, price_cents),
+                stock_quantity = COALESCE($4, stock_quantity),
+                updated_at = NOW()
             WHERE id = $5
             RETURNING id, name, description, price_cents, stock_quantity, created_at, updated_at
             "#,
         )
-        .bind(&name)
-        .bind(&description)
-        .bind(price_cents)
-        .bind(stock_quantity)
+        .bind(dto.name)
+        .bind(dto.description)
+        .bind(dto.price_cents)
+        .bind(dto.stock_quantity)
         .bind(id)
-        .fetch_one(pool)
-        .await?;
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Product with id {id} not found")))?;
 
         Ok(updated)
     }
