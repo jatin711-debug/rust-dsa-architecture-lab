@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>wasm-bindgen Demo</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --bar: #64748b;
+    --compare: #3b82f6;
+    --swap: #f59e0b;
+    --write: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 16px; text-align: center; max-width: 760px; }
+  .subtitle code { background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  .nav { display: flex; gap: 10px; margin-bottom: 12px; }
+  .nav a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 10px;
+    border: 1px solid #334155;
+    border-radius: 6px;
+  }
+  .nav a:hover { background: #334155; }
+  .panel {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 14px 18px;
+    width: min(900px, 100%);
+    margin-bottom: 14px;
+  }
+  button {
+    background: var(--accent);
+    color: #082f49;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.secondary { background: #334155; color: var(--text); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid #334155; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+  td b { color: var(--write); }
+  canvas { width: 100%; height: auto; background: #0b1222; border-radius: 8px; display: block; margin-top: 10px; }
+  .controls { display: flex; gap: 12px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  .info { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .info code { background: var(--bg); padding: 1px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">← Sort visualizer</a>
+    <a href="tree.html">← Tree visualizer</a>
+  </div>
+
+  <h1>wasm-bindgen: the production marshaling layer</h1>
+  <p class="subtitle">
+    Same wasm, but now through <code>wasm-bindgen</code> — the generated glue
+    converts Rust values into JS values for us: <code>Vec&lt;i32&gt;</code> →
+    <code>Int32Array</code>, <code>String</code> → JS string,
+    <code>Result</code> → thrown <code>Error</code>. No raw pointers on this
+    page; <code>new SortRun(kind, n)</code> is a real JS class.
+  </p>
+
+  <div class="panel">
+    <button id="runAll">Run all 4 algorithms (n=100)</button>
+    <table id="stats">
+      <thead>
+        <tr><th>Algorithm</th><th>n</th><th>Steps</th><th>Compares</th><th>Swaps</th><th>Writes</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="info">
+      Stats computed by <code>replay_stats()</code> — the replay runs <b>inside Rust</b>,
+      and the counts come back as a <code>Uint32Array</code>.
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="controls">
+      <select id="algo">
+        <option value="0">Quicksort</option>
+        <option value="1">Mergesort</option>
+        <option value="2">Heapsort</option>
+        <option value="3">Insertion sort</option>
+      </select>
+      <button id="play" class="secondary">Play</button>
+      <button id="step" class="secondary">Step</button>
+      <button id="reset" class="secondary">Reset</button>
+      <span id="runInfo" class="info"></span>
+    </div>
+    <canvas id="canvas" width="880" height="300"></canvas>
+  </div>
+
+  <script type="module" src="bindgen.js"></script>
+</body>
+</html>

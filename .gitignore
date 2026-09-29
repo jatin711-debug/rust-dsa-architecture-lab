@@ -1,0 +1,9 @@
+/target
+**/target/
+node_modules
+__pycache__/
+.env
+**/.env
+.claude/
+.tools/
+**/dist/

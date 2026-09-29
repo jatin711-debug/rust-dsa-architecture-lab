@@ -1,0 +1,20 @@
+[package]
+name = "wasm-visualizer"
+version = "0.1.0"
+edition = "2024"
+description = "Compiles the RustLearningAndDsa library to WebAssembly and exposes step-by-step sort recording"
+
+# cdylib = what wasm32-unknown-unknown consumes; rlib keeps `cargo test` working.
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[features]
+# The raw pointer exports (used by index.html/tree.html) work without
+# wasm-bindgen. The bindgen API (bindgen.html) needs it enabled.
+default = ["bindgen"]
+bindgen = ["dep:wasm-bindgen"]
+
+[dependencies]
+RustLearningAndDsa = { path = ".." }
+wasm-bindgen = { version = "=0.2.100", optional = true }

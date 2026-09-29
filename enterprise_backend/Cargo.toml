@@ -1,0 +1,43 @@
+[package]
+name = "enterprise_backend"
+version = "0.1.0"
+edition = "2021"
+authors = ["Learner"]
+description = "Learning backend API with Axum, SQLx, Redis, JWT, and Postgres"
+
+[dependencies]
+# Web framework & async runtime
+axum = "0.8"
+tokio = { version = "1.42", features = ["full"] }
+
+# Database & SQL toolkit
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+
+# L1 / L2 Cache
+moka = { version = "0.12", features = ["future"] }
+redis = { version = "0.27", features = ["tokio-comp", "aio", "connection-manager"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Auth & Security
+jsonwebtoken = "9.3"
+argon2 = "0.5"
+
+# Error handling & Logging
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "timeout", "catch-panic"] }
+
+# Utilities
+dotenvy = "0.15"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# OpenAPI / Swagger Docs
+utoipa = { version = "5.3", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+
+[workspace]

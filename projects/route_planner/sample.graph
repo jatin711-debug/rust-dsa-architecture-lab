@@ -1,0 +1,8 @@
+# Number of vertices, then directed edges: from to weight
+5
+0 1 4
+0 2 1
+2 1 2
+1 3 1
+2 3 8
+3 4 3

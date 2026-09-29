@@ -1,0 +1,45 @@
+[package]
+name = "RustLearningAndDsa"
+version = "0.1.0"
+edition = "2024"
+authors = ["DSA Learner"]
+description = "Educational data structures and algorithms implemented in Rust from scratch"
+repository = ""
+license = "MIT OR Apache-2.0"
+rust-version = "1.96"
+
+[lib]
+name = "rust_learning_and_dsa"
+path = "src/lib.rs"
+
+[[example]]
+name = "all_data_structures"
+path = "examples/all_data_structures.rs"
+
+[[example]]
+name = "advanced_rust"
+path = "examples/advanced_rust.rs"
+
+[[bench]]
+name = "core_benchmarks"
+path = "benches/core_benchmarks.rs"
+harness = false
+
+[dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = "0.8"
+
+# Workspace: the library plus the WASM visualizer crate.
+# panic = abort is required for wasm32-unknown-unknown (no unwinding support)
+# and is applied to all release builds in this workspace.
+[workspace]
+resolver = "2"
+members = [".", "wasm-visualizer", "projects/mini_grep", "projects/route_planner"]
+exclude = ["enterprise_backend"]
+
+[profile.release]
+panic = "abort"
+# Size-optimized output keeps the wasm download small.
+opt-level = "s"

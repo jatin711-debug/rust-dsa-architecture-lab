@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Rust + WASM Sort Visualizer</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --compare: #3b82f6;
+    --swap: #f59e0b;
+    --write: #22c55e;
+    --bar: #64748b;
+    --sorted: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .subtitle code { background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  .panel {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 14px 18px;
+    width: min(980px, 100%);
+    margin-bottom: 14px;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .control { display: flex; flex-direction: column; gap: 4px; }
+  .control label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  select, input[type="range"] { accent-color: var(--accent); }
+  select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  button {
+    background: var(--accent);
+    color: #082f49;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.secondary { background: #334155; color: var(--text); }
+  canvas {
+    width: 100%;
+    height: auto;
+    background: #0b1222;
+    border-radius: 8px;
+    display: block;
+  }
+  .info { display: flex; gap: 20px; font-size: 13px; color: var(--muted); margin-top: 10px; flex-wrap: wrap; }
+  .info b { color: var(--text); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  #status { color: var(--write); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div style="display:flex;gap:10px;margin-bottom:6px">
+    <a href="tree.html" style="color:#38bdf8;font-size:13px">Tree visualizer (BST vs AVL) &rarr;</a>
+    <a href="bindgen.html" style="color:#38bdf8;font-size:13px">wasm-bindgen demo &rarr;</a>
+  </div>
+  <h1>Rust &rarr; WASM Sort Visualizer</h1>
+  <p class="subtitle">
+    Sorting algorithms from <code>RustLearningAndDsa</code> compiled to
+    <code>wasm32-unknown-unknown</code> &mdash; every comparison, swap, and
+    merge-write recorded in Rust, replayed on a &lt;canvas&gt;.
+  </p>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="control">
+        <label for="algo">Algorithm</label>
+        <select id="algo">
+          <option value="0">Quicksort (median-of-3, 3-way)</option>
+          <option value="1">Mergesort (stable)</option>
+          <option value="2">Heapsort</option>
+          <option value="3">Insertion sort (O(n²))</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="size">Array size: <span id="sizeLabel">100</span></label>
+        <input type="range" id="size" min="10" max="400" step="10" value="100" />
+      </div>
+      <div class="control">
+        <label for="speed">Speed: <span id="speedLabel">30</span> steps/s</label>
+        <input type="range" id="speed" min="1" max="240" step="1" value="30" />
+      </div>
+      <button id="newArray">New array</button>
+      <button id="playPause" class="secondary">Play</button>
+      <button id="step" class="secondary">Step</button>
+      <button id="reset" class="secondary">Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <canvas id="canvas" width="980" height="420"></canvas>
+    <div class="info">
+      <span>Step <b id="stepInfo">0 / 0</b></span>
+      <span>Compares <b id="cmpCount">0</b></span>
+      <span>Swaps <b id="swpCount">0</b></span>
+      <span>Writes <b id="wrtCount">0</b></span>
+      <span id="status"></span>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--compare)"></span>compare</span>
+      <span><span class="dot" style="background:var(--swap)"></span>swap</span>
+      <span><span class="dot" style="background:var(--write)"></span>write</span>
+      <span><span class="dot" style="background:var(--bar)"></span>idle</span>
+      <span><span class="dot" style="background:var(--sorted)"></span>sorted</span>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
