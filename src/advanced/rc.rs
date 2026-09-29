@@ -25,7 +25,6 @@
 //!           └────────────────────────┘
 //! ```
 
-use std::alloc::{self, Layout};
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
@@ -102,7 +101,7 @@ impl<T: ?Sized> Rc<T> {
             (*inner).weak.set((*inner).weak.get() + 1);
         }
         Weak {
-            ptr: this.ptr,
+            ptr: Some(this.ptr),
             _marker: PhantomData,
         }
     }
@@ -136,10 +135,12 @@ impl<T: ?Sized> Rc<T> {
         Ok(ManuallyDrop::into_inner(value))
     }
 
-    /// Returns a mutable reference if this is the only strong reference. O(1).
+    /// Returns a mutable reference if no other strong or weak references exist.
+    /// O(1). A `Weak` could otherwise upgrade while the mutable reference is
+    /// live, creating an aliased shared reference to the same value.
     #[must_use]
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
-        if Rc::strong_count(this) == 1 {
+        if Rc::strong_count(this) == 1 && Rc::weak_count(this) == 0 {
             // SAFETY: unique strong ref + exclusive &mut on the Rc itself.
             Some(unsafe { &mut (*this.ptr.as_ptr()).value })
         } else {
@@ -171,14 +172,13 @@ impl<T: ?Sized> Rc<T> {
     where
         T: Sized,
     {
-        // Recover the header by walking back over the two counters, which are
-        // the fields before `value` (sized T only — for unsized T the value
-        // sits at the end and this offset math does not apply).
-        // SAFETY: pointer arithmetic within the caller-guaranteed allocation;
-        // the header starts exactly two counters before the value.
+        // Rust may add padding before an over-aligned T, so calculate the
+        // actual field offset instead of assuming two counters precede it.
+        // SAFETY: pointer arithmetic stays within the allocation supplied by
+        // the caller-guaranteed Rc::into_raw pointer.
         let inner = unsafe {
             ptr.cast::<u8>()
-                .sub(size_of::<Cell<usize>>() * 2)
+                .sub(std::mem::offset_of!(RcInner<T>, value))
                 .cast::<RcInner<T>>()
                 .cast_mut()
         };
@@ -252,7 +252,7 @@ impl<T: ?Sized> fmt::Pointer for Rc<T> {
 
 /// A non-owning reference to an `Rc`-managed value.
 pub struct Weak<T: ?Sized> {
-    ptr: NonNull<RcInner<T>>,
+    ptr: Option<NonNull<RcInner<T>>>,
     _marker: PhantomData<RcInner<T>>,
 }
 
@@ -260,27 +260,8 @@ impl<T> Weak<T> {
     /// Creates a new, empty `Weak`. `upgrade` always returns `None`. O(1).
     #[must_use]
     pub fn new() -> Self {
-        // An immortal header: strong = 0 (upgrade -> None) and a weak count
-        // large enough that dropping this Weak never frees it. The value slot
-        // is left uninitialized and is never read or dropped.
-        // SAFETY: layout is non-zero and aligned for RcInner<T>.
-        let layout = Layout::new::<RcInner<T>>();
-        let raw = unsafe { alloc::alloc(layout) };
-        // SAFETY: alloc guarantees alignment; `raw` is non-null (checked below
-        // via the Box-free path: alloc returns null on failure, handle it).
-        let Some(raw) = NonNull::new(raw) else {
-            alloc::handle_alloc_error(layout);
-        };
-        let inner = raw.cast::<RcInner<T>>();
-        // SAFETY: the two counter fields are initialized; the value slot is
-        // intentionally never initialized (ManuallyDrop has no validity
-        // requirements beyond alignment, and it is never read).
-        unsafe {
-            ptr::addr_of_mut!((*inner.as_ptr()).strong).write(Cell::new(0));
-            ptr::addr_of_mut!((*inner.as_ptr()).weak).write(Cell::new(usize::MAX));
-        }
         Self {
-            ptr: inner,
+            ptr: None,
             _marker: PhantomData,
         }
     }
@@ -291,16 +272,17 @@ impl<T: ?Sized> Weak<T> {
     /// O(1).
     #[must_use]
     pub fn upgrade(&self) -> Option<Rc<T>> {
+        let ptr = self.ptr?;
         // SAFETY: we hold a weak reference, so the header is alive (weak refs
         // keep the header alive until their count reaches zero).
         unsafe {
-            let inner = self.ptr.as_ptr();
+            let inner = ptr.as_ptr();
             if (*inner).strong.get() == 0 {
                 None
             } else {
                 (*inner).strong.set((*inner).strong.get() + 1);
                 Some(Rc {
-                    ptr: self.ptr,
+                    ptr,
                     _marker: PhantomData,
                 })
             }
@@ -310,18 +292,21 @@ impl<T: ?Sized> Weak<T> {
     /// Number of strong references to the value, or `None` if it's gone. O(1).
     #[must_use]
     pub fn strong_count(&self) -> Option<usize> {
+        let ptr = self.ptr?;
         // SAFETY: the header is alive while we hold a weak reference.
-        let strong = unsafe { (*self.ptr.as_ptr()).strong.get() };
+        let strong = unsafe { (*ptr.as_ptr()).strong.get() };
         (strong != 0).then_some(strong)
     }
 }
 
 impl<T: ?Sized> Clone for Weak<T> {
     fn clone(&self) -> Self {
-        // SAFETY: we hold a weak reference, so the header is alive.
-        unsafe {
-            let inner = self.ptr.as_ptr();
-            (*inner).weak.set((*inner).weak.get() + 1);
+        if let Some(ptr) = self.ptr {
+            // SAFETY: we hold a weak reference, so the header is alive.
+            unsafe {
+                let inner = ptr.as_ptr();
+                (*inner).weak.set((*inner).weak.get() + 1);
+            }
         }
         Self {
             ptr: self.ptr,
@@ -332,18 +317,16 @@ impl<T: ?Sized> Clone for Weak<T> {
 
 impl<T: ?Sized> Drop for Weak<T> {
     fn drop(&mut self) {
+        let Some(ptr) = self.ptr else { return };
         // SAFETY: we hold a weak reference, so the header is alive.
         unsafe {
-            let inner = self.ptr.as_ptr();
+            let inner = ptr.as_ptr();
             let weak = (*inner).weak.get() - 1;
             (*inner).weak.set(weak);
             if weak == 0 && (*inner).strong.get() == 0 {
                 // Last weak reference and the value is already dropped:
                 // free the header.
-                // SAFETY: the header was allocated via Box::into_raw (Rc::new)
-                // or raw alloc (Weak::new, immortal header). The immortal
-                // header never reaches this branch because its weak count is
-                // usize::MAX. So this is always a Box::into_raw allocation,
+                // SAFETY: this allocation came from Box::into_raw (Rc::new),
                 // and the value field is a dropped ManuallyDrop (no-op).
                 drop(Box::from_raw(inner));
             }
@@ -414,6 +397,8 @@ mod tests {
         let weak: Weak<i32> = Weak::new();
         assert!(weak.upgrade().is_none());
         assert_eq!(weak.strong_count(), None);
+        let clone = weak.clone();
+        assert!(clone.upgrade().is_none());
     }
 
     #[test]
@@ -425,6 +410,10 @@ mod tests {
         drop(b);
         Rc::get_mut(&mut a).expect("unique again").push(3);
         assert_eq!(*a, vec![1, 2, 3]);
+        let weak = Rc::downgrade(&a);
+        assert!(Rc::get_mut(&mut a).is_none());
+        drop(weak);
+        assert!(Rc::get_mut(&mut a).is_some());
     }
 
     #[test]
@@ -439,6 +428,15 @@ mod tests {
         }
         let unwrapped = Rc::try_unwrap(b);
         assert!(matches!(unwrapped, Ok(7)));
+    }
+
+    #[test]
+    fn try_unwrap_with_weak_reference() {
+        let strong = Rc::new(String::from("owned"));
+        let weak = Rc::downgrade(&strong);
+        assert_eq!(Rc::try_unwrap(strong).unwrap(), "owned");
+        assert!(weak.upgrade().is_none());
+        drop(weak);
     }
 
     #[test]
@@ -459,6 +457,17 @@ mod tests {
         // SAFETY: raw came from into_raw and is returned exactly once here.
         let restored = unsafe { Rc::from_raw(raw) };
         assert_eq!(*restored, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn into_raw_roundtrip_with_over_aligned_value() {
+        #[repr(align(64))]
+        struct Aligned(u8);
+        let rc = Rc::new(Aligned(7));
+        let raw = Rc::into_raw(rc);
+        // SAFETY: raw came from into_raw and is returned exactly once here.
+        let restored = unsafe { Rc::from_raw(raw) };
+        assert_eq!(restored.0, 7);
     }
 
     #[test]
